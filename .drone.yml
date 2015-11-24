@@ -25,8 +25,8 @@ publish:
       branch: master
 
 plugin:
-  name: Bintray
-  desc: Upload one or more packages to Bintray on build completion.
+  name: drone-bintray
+  desc: Upload one or more artifacts to Bintray on build completion.
   type: publish
   image: plugins/drone-bintray
   labels:
