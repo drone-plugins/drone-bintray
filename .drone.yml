@@ -8,19 +8,15 @@ build:
   commands:
     - echo username=$$DOCKER_USERNAME
     - buildDate="b$DRONE_BUILD_NUMBER`date -u '+ %Y%m%d %H%M%S'`"
-    - echo buildDate=$buildDate
     - go get
     - go build -ldflags="-s -w -X main.buildDate '$buildDate'"
-	
-	# Unit test - update testData/testConfig.json before uncommenting
-    # go test
 
 publish:
   docker:
-    username: $$DOCKER_USERNAME
-    password: $$DOCKER_PASSWORD
+    username: drone
+    password: $$DOCKER_PASS
     email: $$DOCKER_EMAIL
-    repo: tooda02/drone-bintray
+    repo: plugins/drone-bintray
     when:
       branch: master
 
@@ -32,3 +28,4 @@ plugin:
   labels:
     - publish
     - bintray
+    - artifacts
