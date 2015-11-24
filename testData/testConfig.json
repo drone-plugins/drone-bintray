@@ -1,0 +1,34 @@
+{
+    "repo": {
+        "owner": "octocat",
+        "name": "hello-world",
+        "full_name": "octocat/hello-world"
+    },
+    "build": {
+        "number": 1,
+        "status": "success"
+    },
+    "workspace": {
+        "path": "testData"
+    },
+    "vargs": {
+        "username": "<Bintray username>",
+        "api_key": "<Bintray API key>",
+		"branch": "myBranch",
+		"debug": true,
+		"insecure": true,
+        "artifacts": [
+           {
+              "file": "testConfig.json",
+              "owner": "<Bintray subject>",
+              "type": "bin",
+              "repository": "<Bintray repo>",
+              "package": "<Bintray package>",
+              "version": "<Bintray version>",
+              "target": "testConfig.json",
+              "publish": true,
+              "override": true
+           }
+        ]           
+    }
+}

@@ -1,2 +1,4 @@
-# drone-bintray
-Drone plugin for publishing files to Bintray
+# Drone Bintray Plugin
+Drone plugin for publishing to Bintray.
+
+See DOCS.md for usage documentation.
