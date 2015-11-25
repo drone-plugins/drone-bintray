@@ -1,9 +1,4 @@
-# Drone Bintray Plugin
-Use the Bintray plugin to publish one or more packages to a Bintray repository.
-
-## Parameters
-
-You must supply the following parameters in a **bintray** subsection of the .drone.yml **publish** section.
+Use the Bintray plugin to publish one or more packages to a Bintray repository. You must supply the following parameters in a **bintray** subsection of the .drone.yml **publish** section.
 
 Parameter | Description
 --------- | -----------
