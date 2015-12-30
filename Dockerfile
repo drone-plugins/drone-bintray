@@ -3,8 +3,8 @@
 #     CGO_ENABLED=0 go build -a -tags netgo
 #     docker build --rm=true -t plugins/drone-bintray .
 
-FROM gliderlabs/alpine:3.1
-RUN apk-install ca-certificates
-RUN apk-install curl
+FROM alpine:3.3
+RUN apk update && apk add ca-certificates
 ADD drone-bintray /bin/
+COPY ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 ENTRYPOINT ["/bin/drone-bintray"]
