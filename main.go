@@ -7,10 +7,15 @@ Author: David Tootill November 2015 (GitHub tooda02)
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httputil"
 	"os"
-	"os/exec"
-	"regexp"
+	"path"
 	"strings"
 
 	"github.com/drone/drone-go/drone"
@@ -50,6 +55,10 @@ var (
 	bintray   Bintray
 )
 
+type MessageText struct {
+	Message string `json:"message"`
+}
+
 func main() {
 	fmt.Printf("\nDrone Bintray plugin version %s %s\n", version, buildDate)
 	var workspace = drone.Workspace{}
@@ -76,98 +85,161 @@ func main() {
 		artifact.Version = fmt.Sprintf("%v", artifact.Versioni)
 		fmt.Printf("\nUploading file %d %s to %s\n", i+1,
 			artifact.File, artifact.getEndpoint())
-		artifact.Write(workspace.Path)
+		artifact.Upload(workspace.Path)
 	}
 }
 
 // Upload a package to Bintray
-func (this *Artifact) Write(path string) {
+func (this *Artifact) Upload(filename string) {
+	// Build file upload request
+
+	filepath := path.Join(filename, this.File)
+	file, err := os.Open(filepath)
+	if err != nil {
+		fmt.Printf("Unable to open input file %s: %s\n", filepath, err.Error())
+		os.Exit(1)
+	}
+	req, err := http.NewRequest("PUT", this.getEndpoint(), file)
+	if err != nil {
+		fmt.Printf("Unable to build REST request: %s\n", err.Error())
+		os.Exit(1)
+	}
+	req.SetBasicAuth(bintray.Username, bintray.ApiKey)
+	req.Header.Add("X-Bintray-Override", boolToString(this.Override))
+	req.Header.Add("X-Bintray-Publish", boolToString(this.Publish))
+	if this.Type == "Debian" {
+		this.addDebianHeaders(req)
+	}
+
+	// Set up an HTTP client with a bundled root CA certificate (borrowed from Ubuntu 14.04)
+	// This is necessary because the required certificate is missing from the root image and
+	// without it the upload fails with "x509: failed to load system roots and no roots provided"
+
+	client := http.Client{}
+	pool := x509.NewCertPool()
+	if pemCerts, err := ioutil.ReadFile("/etc/ssl/certs/ca-certificates.crt"); err != nil {
+		fmt.Printf("Unable to read ca-certificates.crt: %s\n", err.Error())
+		os.Exit(1)
+	} else {
+		pool.AppendCertsFromPEM(pemCerts)
+		client.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs:            pool,
+				InsecureSkipVerify: bintray.Insecure,
+			},
+		}
+	}
+	if bintray.Debug {
+		dumpRequest("DEBUG HTTP Request", req)
+	}
+
+	// Execute the upload request and format the response
+
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("Upload request failed: %s\n", err.Error())
+		dumpRequest("Failing request", req)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Unable to read request response: %s\n", err.Error())
+		dumpRequest("Failing request", req)
+		os.Exit(1)
+	}
+	messageText := new(MessageText)
+	if len(respBody) > 0 {
+		json.Unmarshal(respBody, messageText)
+	}
+	if resp.StatusCode > 299 {
+		errorText := fmt.Sprintf("Error %d", resp.StatusCode)
+		httpErrorText := http.StatusText(resp.StatusCode)
+		if len(httpErrorText) > 0 {
+			errorText += " " + httpErrorText
+		}
+		if len(messageText.Message) > 0 {
+			errorText += " - " + messageText.Message
+		}
+		fmt.Printf("%s\n", errorText)
+		dumpRequest("Failing request", req)
+		os.Exit(1)
+	}
+
+	if len(messageText.Message) == 0 && len(respBody) > 0 {
+		messageText.Message = string(respBody)
+	}
+	fmt.Printf("Result: %s\n", messageText.Message)
+	if messageText.Message != "success" {
+		if this.Override || !strings.Contains(messageText.Message, "already exists") {
+			dumpRequest("\nRequest was:", req)
+			os.Exit(1)
+		}
+	}
+}
+
+// Add headers required to upload a Debian package
+func (this *Artifact) addDebianHeaders(req *http.Request) {
+	if len(this.Distr) == 0 || len(this.Component) == 0 || len(this.Arch) == 0 {
+		fmt.Printf("ERROR Cannot process package %s - Missing Debian argument(s):\n", this.Artifact)
+
+		if len(this.Distr) == 0 {
+			fmt.Printf("    distr not defined in yaml config\n")
+		}
+
+		if len(this.Component) == 0 {
+			fmt.Printf("    component not defined in yaml config\n")
+		}
+
+		if len(this.Arch) == 0 {
+			fmt.Printf("    arch not defined in yaml config\n")
+		}
+
+		os.Exit(1)
+	}
+
+	req.Header.Add("X-Bintray-Debian-Distribution: %s", this.Distr)
+	req.Header.Add("X-Bintray-Debian-Component: %s", this.Component)
+	req.Header.Add("X-Bintray-Debian-Architecture: %s", strings.Join(this.Arch, ","))
+}
+
+// Get the Bintray endpoint corresponding to this package and version
+func (this *Artifact) getEndpoint() string {
 	if len(this.File) == 0 ||
 		len(this.Owner) == 0 ||
 		len(this.Repository) == 0 ||
 		len(this.Artifact) == 0 ||
 		(len(this.Version) == 0 && this.Type != "Maven") ||
 		len(this.Target) == 0 {
-		fmt.Printf("Bintray Plugin: Missing argument(s)\n\n")
+		fmt.Printf("ERROR Cannot process package %s - Missing argument(s):\n", this.Artifact)
 
 		if len(this.Artifact) == 0 {
-			fmt.Printf("\tpackage not defined in yaml config")
+			fmt.Printf("    package not defined in yaml config\n")
 		}
 
 		if len(this.File) == 0 {
-			fmt.Printf("\tpackage %s: file not defined in yaml config", this.Artifact)
+			fmt.Printf("    file not defined in yaml config\n")
 		}
 
 		if len(this.Owner) == 0 {
-			fmt.Printf("\tpackage %s: owner not defined in yaml config", this.Artifact)
+			fmt.Printf("    owner not defined in yaml config\n")
 		}
 
 		if len(this.Repository) == 0 {
-			fmt.Printf("\tpackage %s: repository not defined in yaml config", this.Artifact)
+			fmt.Printf("    repository not defined in yaml config\n")
 		}
 
 		if len(this.Version) == 0 && this.Type != "Maven" {
-			fmt.Printf("\tpackage %s: version not defined in yaml config", this.Artifact)
+			fmt.Printf("    version not defined in yaml config\n")
 		}
 
 		if len(this.Target) == 0 {
-			fmt.Printf("\tpackage %s: target not defined in yaml config", this.Artifact)
+			fmt.Printf("    target not defined in yaml config\n")
 		}
 
 		os.Exit(1)
 	}
 
-	switch this.Type {
-	case "Debian":
-		this.debUpload(path)
-	default:
-		this.upload(path)
-	}
-}
-
-// Upload a Debian package
-func (this *Artifact) debUpload(path string) {
-	if len(this.Distr) == 0 || len(this.Component) == 0 || len(this.Arch) == 0 {
-		fmt.Printf("Bintray Plugin: Missing argument(s)\n\n")
-
-		if len(this.Distr) == 0 {
-			fmt.Printf("\tDebian package %s: distr not defined in yaml config", this.Artifact)
-		}
-
-		if len(this.Component) == 0 {
-			fmt.Printf("\tDebian package %s: component not defined in yaml config", this.Artifact)
-		}
-
-		if len(this.Arch) == 0 {
-			fmt.Printf("\tDebian package %s: arch not defined in yaml config", this.Artifact)
-		}
-
-		os.Exit(1)
-	}
-
-	this.execCommand("curl", bintray.ApiKey,
-		"-H", fmt.Sprintf("X-Bintray-Debian-Distribution: %s", this.Distr),
-		"-H", fmt.Sprintf("X-Bintray-Debian-Component: %s", this.Component),
-		"-H", fmt.Sprintf("X-Bintray-Debian-Architecture: %s", strings.Join(this.Arch, ",")),
-		"-H", fmt.Sprintf("X-Bintray-Override: %d", boolToInt(this.Override)),
-		"-H", fmt.Sprintf("X-Bintray-Publish: %d", boolToInt(this.Publish)),
-		"-T", fmt.Sprintf("%s/%s", path, this.File),
-		fmt.Sprintf("-u%s:%s", bintray.Username, bintray.ApiKey),
-		this.getEndpoint())
-}
-
-// Upload a non-Debian package
-func (this *Artifact) upload(path string) {
-	this.execCommand("curl", bintray.ApiKey,
-		"-H", fmt.Sprintf("X-Bintray-Override: %d", boolToInt(this.Override)),
-		"-H", fmt.Sprintf("X-Bintray-Publish: %d", boolToInt(this.Publish)),
-		"-T", fmt.Sprintf("%s/%s", path, this.File),
-		fmt.Sprintf("-u%s:%s", bintray.Username, bintray.ApiKey),
-		this.getEndpoint())
-}
-
-// Get the Bintray endpoint corresponding to this package and version
-func (this *Artifact) getEndpoint() string {
 	contentType := "content"
 	if this.Type == "Maven" {
 		contentType = "maven"
@@ -182,41 +254,29 @@ func (this *Artifact) getEndpoint() string {
 	return fmt.Sprintf("%stest/%s/%s", endpoint, bintray.Branch, this.Target)
 }
 
-// Run a command and test result
-func (this *Artifact) execCommand(c string, api_key string, args ...string) {
-	if bintray.Insecure {
-		args = append(args, "-k")
-	}
-	cmd := exec.Command(c, args...)
-	output, err := cmd.CombinedOutput()
-	outputString := string(output)
-	message := ""
-	rxMessage := regexp.MustCompile(`"message":"([^"]*)"`)
-	if match := rxMessage.FindStringSubmatch(outputString); match != nil {
-		message = match[1]
-		fmt.Printf("Result: %s\n", message)
-	}
-	if err == nil && message != "success" {
-		if this.Override || !strings.Contains(message, "already exists") {
-			err = fmt.Errorf("Bintray upload failed")
+// Dump an HTTP request to stdout, hiding the authorization tag
+func dumpRequest(prefix string, req *http.Request) {
+	fmt.Printf("%s:\n", prefix)
+	if dumpedRequest, err := httputil.DumpRequestOut(req, false); err != nil {
+		fmt.Printf("  %s\n", err.Error())
+	} else {
+		for _, line := range strings.Split(string(dumpedRequest), "\n") {
+			line = strings.TrimSpace(line)
+			if len(line) > 0 {
+				if strings.HasPrefix(line, "Authorization:") {
+					line = "Authorization: Basic xxxxxxxxxx"
+				}
+				fmt.Printf("    %s\n", line)
+			}
 		}
 	}
-	if err != nil {
-		fmt.Printf("%s\n", strings.Replace(strings.Join(cmd.Args, " "), api_key, "******", -1))
-		fmt.Printf("%s\n", outputString)
-		fmt.Printf("ERROR %s\n", err.Error())
-		os.Exit(1)
-	} else if bintray.Debug {
-		fmt.Printf("DEBUG command executed:\n%s\n", strings.Replace(strings.Join(cmd.Args, " "), api_key, "******", -1))
-		fmt.Printf("%s\n", outputString)
-	}
-	return
 }
 
-func boolToInt(val bool) int {
+// Convert a boolean value to string "1" or "0"
+func boolToString(val bool) string {
 	if val {
-		return 1
+		return "1"
 	} else {
-		return 0
+		return "0"
 	}
 }
