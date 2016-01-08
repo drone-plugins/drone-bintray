@@ -250,7 +250,7 @@ func (this *Artifact) getEndpoint() string {
 		contentType = "maven"
 	}
 
-	endpoint := fmt.Sprintf(bintray.Host+"/%s/%s/%s/%s/", contentType, this.Owner, this.Repository, this.Artifact)
+	endpoint := fmt.Sprintf("%s/%s/%s/%s/%s/", bintray.Host, contentType, this.Owner, this.Repository, this.Artifact)
 	if len(this.Version) > 0 && this.Type != "Maven" {
 		endpoint = fmt.Sprintf("%s%s/", endpoint, this.Version)
 	}
