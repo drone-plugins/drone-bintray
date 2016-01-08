@@ -22,13 +22,13 @@ import (
 	"github.com/drone/drone-go/plugin"
 )
 
-const bintray_endpoint = "https://api.bintray.com/%s/%s/%s/%s/"
+const defaultHost = "https://api.bintray.com"
 
 type Bintray struct {
 	Username  string     `json:"username"`
-	ApiKey    string     `json:"api_key"`
+	APIKey    string     `json:"api_key"`
 	Branch    string     `json:"branch"`
-	URL       string     `json:"url"`
+	Host      string     `json:"host"`
 	Debug     bool       `json:"debug"`
 	Insecure  bool       `json:"insecure"`
 	Artifacts []Artifact `json:"artifacts"`
@@ -71,17 +71,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	if bintray.URL == "" {
-		bintray.URL = bintray_endpoint
-	} else {
-		bintray.URL = bintray.URL + "/%s/%s/%s/%s/"
+	if bintray.Host == "" {
+		bintray.Host = defaultHost
 	}
 
 	if bintray.Debug {
-		saveApikey := bintray.ApiKey
-		bintray.ApiKey = "******"
+		saveApikey := bintray.APIKey
+		bintray.APIKey = "******"
 		fmt.Printf("DEBUG plugin input:\n%#v\n%#v\n", workspace, bintray)
-		bintray.ApiKey = saveApikey
+		bintray.APIKey = saveApikey
 	}
 	if len(bintray.Branch) == 0 || bintray.Branch == "master" {
 		fmt.Printf("\nPublishing %d artifacts to Bintray for user %s\n", len(bintray.Artifacts), bintray.Username)
@@ -111,7 +109,7 @@ func (this *Artifact) Upload(filename string) {
 		fmt.Printf("Unable to build REST request: %s\n", err.Error())
 		os.Exit(1)
 	}
-	req.SetBasicAuth(bintray.Username, bintray.ApiKey)
+	req.SetBasicAuth(bintray.Username, bintray.APIKey)
 	req.Header.Add("X-Bintray-Override", boolToString(this.Override))
 	req.Header.Add("X-Bintray-Publish", boolToString(this.Publish))
 	if this.Type == "Debian" {
@@ -251,7 +249,8 @@ func (this *Artifact) getEndpoint() string {
 	if this.Type == "Maven" {
 		contentType = "maven"
 	}
-	endpoint := fmt.Sprintf(bintray.URL, contentType, this.Owner, this.Repository, this.Artifact)
+
+	endpoint := fmt.Sprintf(bintray.Host+"/%s/%s/%s/%s/", contentType, this.Owner, this.Repository, this.Artifact)
 	if len(this.Version) > 0 && this.Type != "Maven" {
 		endpoint = fmt.Sprintf("%s%s/", endpoint, this.Version)
 	}
