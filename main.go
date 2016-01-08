@@ -28,6 +28,7 @@ type Bintray struct {
 	Username  string     `json:"username"`
 	ApiKey    string     `json:"api_key"`
 	Branch    string     `json:"branch"`
+	URL       string     `json:"url"`
 	Debug     bool       `json:"debug"`
 	Insecure  bool       `json:"insecure"`
 	Artifacts []Artifact `json:"artifacts"`
@@ -68,6 +69,12 @@ func main() {
 	if err := plugin.Parse(); err != nil {
 		fmt.Printf("ERROR Can't parse yaml config: %s", err.Error())
 		os.Exit(1)
+	}
+
+	if bintray.URL == "" {
+		bintray.URL = bintray_endpoint
+	} else {
+		bintray.URL = bintray.URL + "/%s/%s/%s/%s/"
 	}
 
 	if bintray.Debug {
@@ -244,7 +251,7 @@ func (this *Artifact) getEndpoint() string {
 	if this.Type == "Maven" {
 		contentType = "maven"
 	}
-	endpoint := fmt.Sprintf(bintray_endpoint, contentType, this.Owner, this.Repository, this.Artifact)
+	endpoint := fmt.Sprintf(bintray.URL, contentType, this.Owner, this.Repository, this.Artifact)
 	if len(this.Version) > 0 && this.Type != "Maven" {
 		endpoint = fmt.Sprintf("%s%s/", endpoint, this.Version)
 	}
