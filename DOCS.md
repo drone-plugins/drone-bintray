@@ -4,7 +4,7 @@ Parameter | Description
 --------- | -----------
 username  | A Bintray username
 api_key | The API key associated with the username (obtain from Bintray settings)
-URL | The host url of the Bintray server.
+host | Optional host of the bintray server with scheme. Example: https://bin.company.com
 branch | The GitHub branch of the commit.  A non-empty value other than "master" causes the plugin to upload artifacts to test/branchname/target instead of just target
 debug | If true, causes the plugin to write additional output to stdout, including its invocation arguments and output curl command.
 insecure | Enable insecure connections
@@ -18,7 +18,6 @@ file | Path to the file to upload within the build directory (the original build
 owner | Bintray repository owner (called subject in Bintray API documentation)
 type | Artifact type.  Specify "Debian" for a Debian artifact or "Maven" for a Maven artifact.  Any other value indicates a generic artifact.
 repository | Name of the repository where the file should be uploaded
-host | Optional host of the bintray server with scheme. Example: https://bin.company.com
 package | Name of the package within the repository
 version | Version to upload.  Required for non-Maven artifacts and ignored for Maven.
 target | Name to be given to the artifact in the repository.  The name is prefixed by "test/branchname" if the branch parameter is specified and has a non-empty value other than "master"
