@@ -51,8 +51,7 @@ type Artifact struct {
 }
 
 var (
-	version   string = "1.0"
-	buildDate string // Filled from build
+	buildDate string
 	bintray   Bintray
 )
 
@@ -61,7 +60,8 @@ type MessageText struct {
 }
 
 func main() {
-	fmt.Printf("\nDrone Bintray plugin version %s %s\n", version, buildDate)
+	fmt.Printf("Drone Bintray Plugin built at %s\n", buildDate)
+
 	var workspace = drone.Workspace{}
 
 	plugin.Param("workspace", &workspace)
