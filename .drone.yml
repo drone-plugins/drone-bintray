@@ -6,7 +6,6 @@ build:
     - make deps
     - make vet
     - make build
-    - make test
 
 publish:
   coverage:
