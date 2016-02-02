@@ -1,28 +1,36 @@
 build:
   image: golang:1.5
   environment:
-    - GO15VENDOREXPERIMENT=1
-    - GOOS=linux
-    - GOARCH=amd64
     - CGO_ENABLED=0
   commands:
-    - echo username=$$DOCKER_USERNAME
-    - buildDate="b$DRONE_BUILD_NUMBER`date -u '+ %Y%m%d %H%M%S'`"
-    - go get
-    - go build -ldflags="-s -w -X main.buildDate '$buildDate'"
+    - make deps
+    - make vet
+    - make build
 
 publish:
+  coverage:
+    when:
+      branch: master
   docker:
-    username: drone
+    username: $$DOCKER_USER
     password: $$DOCKER_PASS
     email: $$DOCKER_EMAIL
     repo: plugins/drone-bintray
+    tag: latest
     when:
       branch: master
+  docker:
+    username: $$DOCKER_USER
+    password: $$DOCKER_PASS
+    email: $$DOCKER_EMAIL
+    repo: plugins/drone-bintray
+    tag: develop
+    when:
+      branch: develop
 
 plugin:
   name: Bintray
-  desc: Upload one or more artifacts to Bintray on build completion.
+  desc: Publish files and artifacts to Bintray
   type: publish
   image: plugins/drone-bintray
   labels:
