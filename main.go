@@ -203,9 +203,9 @@ func (this *Artifact) addDebianHeaders(req *http.Request) {
 		os.Exit(1)
 	}
 
-	req.Header.Add("X-Bintray-Debian-Distribution: %s", this.Distr)
-	req.Header.Add("X-Bintray-Debian-Component: %s", this.Component)
-	req.Header.Add("X-Bintray-Debian-Architecture: %s", strings.Join(this.Arch, ","))
+	req.Header.Add("X-Bintray-Debian-Distribution", this.Distr)
+	req.Header.Add("X-Bintray-Debian-Component", this.Component)
+	req.Header.Add("X-Bintray-Debian-Architecture", strings.Join(this.Arch, ","))
 }
 
 // Get the Bintray endpoint corresponding to this package and version
