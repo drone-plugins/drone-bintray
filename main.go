@@ -51,7 +51,7 @@ type Artifact struct {
 }
 
 var (
-	buildDate string
+	buildCommit string
 	bintray   Bintray
 )
 
@@ -60,7 +60,7 @@ type MessageText struct {
 }
 
 func main() {
-	fmt.Printf("Drone Bintray Plugin built at %s\n", buildDate)
+	fmt.Printf("Drone Bintray Plugin built from %s\n", buildCommit)
 
 	var workspace = drone.Workspace{}
 
