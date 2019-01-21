@@ -7,7 +7,6 @@
 [![](https://images.microbadger.com/badges/image/plugins/bintray.svg)](https://microbadger.com/images/plugins/bintray "Get your own image badge on microbadger.com")
 [![Go Doc](https://godoc.org/github.com/drone-plugins/drone-bintray?status.svg)](http://godoc.org/github.com/drone-plugins/drone-bintray)
 [![Go Report](https://goreportcard.com/badge/github.com/drone-plugins/drone-bintray)](https://goreportcard.com/report/github.com/drone-plugins/drone-bintray)
-[![](https://images.microbadger.com/badges/image/plugins/bintray.svg)](https://microbadger.com/images/plugins/bintray "Get your own image badge on microbadger.com")
 
 Drone plugin to publish files and artifacts to Bintray. For the usage information and a listing of the available options please take a look at [the docs](DOCS.md).
 
